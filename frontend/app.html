@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogicCoach Pro - 模拟面试系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        .highlight-critical { background-color: rgba(239, 68, 68, 0.2); border-bottom: 2px dashed #ef4444; cursor: help; }
+        .recording-pulse { animation: pulse-red 1.5s infinite; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+        @keyframes pulse-red {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col">
+
+    <header class="bg-slate-900 border-b border-slate-700 p-4 flex justify-between items-center shadow-md z-10">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white">L</div>
+            <h1 class="text-xl font-bold text-white">LogicCoach <span class="text-blue-500 text-sm align-top">Pro</span></h1>
+        </div>
+        <div class="text-xs text-gray-500">DeepSeek-V3 | RAG Knowledge Base</div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        
+        <div class="w-1/3 min-w-[350px] bg-slate-900 border-r border-slate-700 p-6 overflow-y-auto flex flex-col gap-6">
+            <div>
+                <h2 class="text-sm font-bold text-blue-400 uppercase mb-3 flex items-center gap-2">
+                    <i class="ri-briefcase-line"></i> 目标职位描述 (JD)
+                </h2>
+                <textarea id="jd-input" class="w-full h-40 bg-slate-800 border border-slate-600 rounded-xl p-3 text-sm text-gray-300 focus:outline-none focus:border-blue-500 transition-colors resize-none placeholder-gray-600" placeholder="在此粘贴你想要面试的岗位 JD...&#10;AI 将基于此要求进行人岗匹配评估。"></textarea>
+            </div>
+            
+            <div>
+                <h2 class="text-sm font-bold text-green-400 uppercase mb-3 flex items-center gap-2">
+                    <i class="ri-user-line"></i> 你的简历概要
+                </h2>
+                <textarea id="resume-input" class="w-full h-40 bg-slate-800 border border-slate-600 rounded-xl p-3 text-sm text-gray-300 focus:outline-none focus:border-green-500 transition-colors resize-none placeholder-gray-600" placeholder="在此粘贴你的简历经历...&#10;AI 将检查你的回答是否充分挖掘了过往亮点。"></textarea>
+            </div>
+
+            <div class="bg-slate-800/50 p-4 rounded-xl border border-dashed border-slate-600">
+                <p class="text-xs text-gray-400 leading-relaxed">
+                    <i class="ri-information-line mr-1"></i>
+                    提示：左侧内容留空则进行通用面试评估。填写越详细，DeepSeek 的点评越犀利。
+                </p>
+            </div>
+        </div>
+
+        <div class="flex-1 bg-slate-800/50 p-6 overflow-y-auto relative">
+            
+            <div class="max-w-4xl mx-auto space-y-8 pb-20">
+                
+                <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl flex flex-col items-center justify-center relative overflow-hidden">
+                    <div class="text-center mb-8">
+                        <h2 class="text-2xl font-bold text-white mb-2" id="status-text">准备就绪</h2>
+                        <p class="text-gray-400 text-sm">点击录音或上传文件开始分析</p>
+                    </div>
+
+                    <div class="flex items-center gap-8">
+                        <div class="relative group">
+                            <input type="file" id="file-upload" accept="audio/*" class="hidden">
+                            <button onclick="document.getElementById('file-upload').click()" class="w-14 h-14 rounded-full bg-slate-700 hover:bg-slate-600 text-gray-300 flex items-center justify-center transition-all border border-slate-600 group-hover:border-blue-500">
+                                <i class="ri-upload-cloud-2-line text-xl"></i>
+                            </button>
+                            <span class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs text-gray-500 w-max opacity-0 group-hover:opacity-100 transition-opacity">上传录音</span>
+                        </div>
+
+                        <button id="record-btn" class="w-24 h-24 rounded-full bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/50 flex items-center justify-center transition-all">
+                            <i id="mic-icon" class="ri-mic-fill text-4xl text-white"></i>
+                        </button>
+
+                        <div class="relative group">
+                            <button onclick="window.location.reload()" class="w-14 h-14 rounded-full bg-slate-700 hover:bg-slate-600 text-gray-300 flex items-center justify-center transition-all border border-slate-600 group-hover:border-red-500">
+                                <i class="ri-refresh-line text-xl"></i>
+                            </button>
+                            <span class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs text-gray-500 w-max opacity-0 group-hover:opacity-100 transition-opacity">刷新重置</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="result-panel" class="hidden space-y-6 animate-fade-in-up">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm uppercase font-bold">综合得分</p>
+                                <h3 id="total-score" class="text-4xl font-bold text-white mt-1">--</h3>
+                            </div>
+                            <div id="score-ring" class="w-16 h-16 rounded-full border-4 border-slate-600 flex items-center justify-center">
+                                <span class="text-xl">🏆</span>
+                            </div>
+                        </div>
+                        
+                        <div class="md:col-span-2 bg-slate-800 p-6 rounded-2xl border border-slate-700 h-32 overflow-y-auto">
+                            <p class="text-xs text-gray-500 uppercase font-bold mb-2 sticky top-0 bg-slate-800">Transcript</p>
+                            <div id="transcription-box" class="text-gray-300 text-sm leading-relaxed">...</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">
+                            <canvas id="radarChart"></canvas>
+                        </div>
+                        
+                        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex flex-col">
+                            <h3 class="text-gray-400 text-sm uppercase font-bold mb-4 flex items-center gap-2">
+                                <i class="ri-openai-fill text-green-500"></i> Link 助理点评
+                            </h3>
+                            <div id="ai-feedback" class="text-gray-300 text-sm leading-relaxed flex-1 whitespace-pre-line">
+                                分析结果将显示在这里...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="loading-spinner" class="hidden py-12 text-center">
+                    <div class="inline-block w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <p class="text-blue-400 animate-pulse">DeepSeek 正在根据 JD 和知识库深度思考...</p>
+                    <p class="text-xs text-gray-500 mt-2">Connecting to Knowledge Base...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        // DOM 元素
+        const recordBtn = document.getElementById('record-btn');
+        const micIcon = document.getElementById('mic-icon');
+        const statusText = document.getElementById('status-text');
+        const resultPanel = document.getElementById('result-panel');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const fileUpload = document.getElementById('file-upload');
+        
+        // --- 1. 初始化图表 ---
+        let radarChart;
+        function initChart(data = [0,0,0,0,0,0,0]) {
+            const ctx = document.getElementById('radarChart').getContext('2d');
+            if(radarChart) radarChart.destroy();
+            radarChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['业务洞察', '产品设计', '逻辑思维', '沟通表达', '项目管理', '抗压能力', '软素质'],
+                    datasets: [{
+                        label: '能力模型',
+                        data: data,
+                        backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                        borderColor: '#2563eb',
+                        pointBackgroundColor: '#2563eb',
+                        pointBorderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            pointLabels: { color: '#94a3b8', font: {size: 11} },
+                            suggestedMin: 0, suggestedMax: 100
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+        initChart();
+
+        // --- 2. 核心逻辑: 发送数据到后端 ---
+        async function analyzeData(audioBlob) {
+            // UI 切换到 Loading
+            resultPanel.classList.add('hidden');
+            loadingSpinner.classList.remove('hidden');
+            statusText.innerText = "正在分析中...";
+
+            const formData = new FormData();
+            formData.append("file", audioBlob, "upload.wav");
+            
+            // 🔥 获取左侧文本框的内容 🔥
+            const jdText = document.getElementById('jd-input').value;
+            const resumeText = document.getElementById('resume-input').value;
+            formData.append("jd_text", jdText);
+            formData.append("resume_text", resumeText);
+
+            try {
+                // 发送请求
+                const response = await fetch("http://127.0.0.1:8000/analyze_audio", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.status === "success") {
+                    renderResult(data);
+                } else {
+                    alert("错误: " + data.message);
+                }
+            } catch (error) {
+                console.error(error);
+                alert("无法连接后端，请检查 uvicorn 是否运行！");
+            } finally {
+                loadingSpinner.classList.add('hidden');
+                statusText.innerText = "分析完成";
+            }
+        }
+
+        // --- 3. 结果渲染 ---
+        function renderResult(data) {
+            resultPanel.classList.remove('hidden');
+            
+            // 文本高亮
+            let htmlText = data.transcription;
+            if (data.ai_analysis.annotations) {
+                data.ai_analysis.annotations.forEach(anno => {
+                    htmlText = htmlText.replace(anno.quote, 
+                        `<span class="highlight-critical" title="${anno.comment}">${anno.quote}</span>`);
+                });
+            }
+            document.getElementById('transcription-box').innerHTML = htmlText;
+
+            // 分数更新
+            const dims = data.ai_analysis.dimensions || {};
+            const scores = [
+                dims.business || 0, dims.product || 0, dims.logic || 0, 
+                dims.communication || 0, dims.project || 0, dims.stress || 0, dims.soft_skills || 0
+            ];
+            initChart(scores);
+
+            const totalScore = data.ai_analysis.total_score || 0;
+            document.getElementById('total-score').innerText = totalScore;
+            
+            // 动态分数颜色
+            const ring = document.getElementById('score-ring');
+            ring.style.borderColor = totalScore >= 80 ? '#22c55e' : (totalScore >= 60 ? '#eab308' : '#ef4444');
+            document.getElementById('total-score').className = `text-4xl font-bold mt-1 ${totalScore >= 80 ? 'text-green-400' : (totalScore >= 60 ? 'text-yellow-400' : 'text-red-400')}`;
+
+            // 点评
+            document.getElementById('ai-feedback').innerText = data.ai_analysis.feedback_summary;
+        }
+
+        // --- 4. 录音功能实现 ---
+        recordBtn.addEventListener('click', async () => {
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(audioChunks, { type: 'audio/wav' });
+                        analyzeData(blob);
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    
+                    // 样式变为录音中
+                    recordBtn.classList.remove('bg-blue-600');
+                    recordBtn.classList.add('bg-red-600', 'recording-pulse');
+                    micIcon.className = "ri-stop-fill text-4xl text-white";
+                    statusText.innerText = "正在录音... (点击停止)";
+                } catch (err) {
+                    alert("麦克风权限被拒绝 🎤");
+                }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.classList.remove('bg-red-600', 'recording-pulse');
+                recordBtn.classList.add('bg-blue-600');
+                micIcon.className = "ri-mic-fill text-4xl text-white";
+            }
+        });
+
+        // --- 5. 文件上传功能实现 ---
+        fileUpload.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                statusText.innerText = `正在分析文件: ${file.name}`;
+                analyzeData(file);
+            }
+        });
+    </script>
+</body>
+</html>
