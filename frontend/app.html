@@ -3,258 +3,330 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogicCoach Pro - 模拟面试系统</title>
+    <title>LogicCoach Pro - 深度复盘</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; }
-        .highlight-critical { background-color: rgba(239, 68, 68, 0.2); border-bottom: 2px dashed #ef4444; cursor: help; }
-        .recording-pulse { animation: pulse-red 1.5s infinite; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-        @keyframes pulse-red {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        body { font-family: 'Inter', system-ui, sans-serif; background-color: #0B1121; color: #e2e8f0; }
+        
+        .highlight-critical { 
+            border-bottom: 2px dashed #ef4444; 
+            background-color: rgba(239, 68, 68, 0.15);
+            cursor: help;
+            position: relative;
         }
-        /* 自定义滚动条 */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #1e293b; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .highlight-warning { 
+            border-bottom: 2px dashed #eab308; 
+            background-color: rgba(234, 179, 8, 0.15);
+            cursor: help;
+            position: relative;
+        }
+        
+        /* Tooltip */
+        .highlight-critical:hover::after, .highlight-warning:hover::after {
+            content: attr(data-reason);
+            position: absolute;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 50;
+            border: 1px solid #475569;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .recording-pulse { animation: pulse-red 1.5s infinite; }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
     </style>
 </head>
-<body class="h-screen overflow-hidden flex flex-col">
+<body class="h-screen flex flex-col overflow-hidden">
 
-    <header class="bg-slate-900 border-b border-slate-700 p-4 flex justify-between items-center shadow-md z-10">
+    <header class="bg-[#0F172A] border-b border-slate-800 p-4 flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2">
-            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white">L</div>
-            <h1 class="text-xl font-bold text-white">LogicCoach <span class="text-blue-500 text-sm align-top">Pro</span></h1>
+            <i class="ri-openai-fill text-blue-500 text-2xl"></i>
+            <h1 class="text-xl font-bold tracking-tight">LogicCoach <span class="text-xs bg-blue-900 text-blue-300 px-2 py-0.5 rounded">Pro</span></h1>
         </div>
-        <div class="text-xs text-gray-500">DeepSeek-V3 | RAG Knowledge Base</div>
+        <button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-700 text-gray-300 px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2">
+            <i class="ri-refresh-line"></i> 新面试
+        </button>
     </header>
 
-    <div class="flex flex-1 overflow-hidden">
-        
-        <div class="w-1/3 min-w-[350px] bg-slate-900 border-r border-slate-700 p-6 overflow-y-auto flex flex-col gap-6">
-            <div>
-                <h2 class="text-sm font-bold text-blue-400 uppercase mb-3 flex items-center gap-2">
-                    <i class="ri-briefcase-line"></i> 目标职位描述 (JD)
-                </h2>
-                <textarea id="jd-input" class="w-full h-40 bg-slate-800 border border-slate-600 rounded-xl p-3 text-sm text-gray-300 focus:outline-none focus:border-blue-500 transition-colors resize-none placeholder-gray-600" placeholder="在此粘贴你想要面试的岗位 JD...&#10;AI 将基于此要求进行人岗匹配评估。"></textarea>
-            </div>
-            
-            <div>
-                <h2 class="text-sm font-bold text-green-400 uppercase mb-3 flex items-center gap-2">
-                    <i class="ri-user-line"></i> 你的简历概要
-                </h2>
-                <textarea id="resume-input" class="w-full h-40 bg-slate-800 border border-slate-600 rounded-xl p-3 text-sm text-gray-300 focus:outline-none focus:border-green-500 transition-colors resize-none placeholder-gray-600" placeholder="在此粘贴你的简历经历...&#10;AI 将检查你的回答是否充分挖掘了过往亮点。"></textarea>
-            </div>
+    <div class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
+        <div class="max-w-6xl mx-auto space-y-6">
 
-            <div class="bg-slate-800/50 p-4 rounded-xl border border-dashed border-slate-600">
-                <p class="text-xs text-gray-400 leading-relaxed">
-                    <i class="ri-information-line mr-1"></i>
-                    提示：左侧内容留空则进行通用面试评估。填写越详细，DeepSeek 的点评越犀利。
-                </p>
-            </div>
-        </div>
-
-        <div class="flex-1 bg-slate-800/50 p-6 overflow-y-auto relative">
-            
-            <div class="max-w-4xl mx-auto space-y-8 pb-20">
+            <div id="setup-panel" class="bg-[#162032] border border-slate-700 rounded-2xl p-6 shadow-xl transition-all duration-300">
                 
-                <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl flex flex-col items-center justify-center relative overflow-hidden">
-                    <div class="text-center mb-8">
-                        <h2 class="text-2xl font-bold text-white mb-2" id="status-text">准备就绪</h2>
-                        <p class="text-gray-400 text-sm">点击录音或上传文件开始分析</p>
+                <div class="flex gap-4 mb-4 text-xs text-gray-400">
+                    <label class="flex items-center gap-2 cursor-pointer hover:text-white">
+                        <input type="radio" name="mode" value="mock" checked class="accent-blue-500" onclick="toggleMode('mock')"> 
+                        <span>模拟面试 (输入题目)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer hover:text-white">
+                        <input type="radio" name="mode" value="upload" class="accent-blue-500" onclick="toggleMode('upload')"> 
+                        <span>录音复盘 (已有文件)</span>
+                    </label>
+                </div>
+
+                <div class="flex gap-4 mb-6">
+                    <div class="w-1/2 flex flex-col gap-2">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase">目标职位 (JD)</h3>
+                        <textarea id="jd-input" class="flex-1 bg-slate-900/50 border border-slate-700 rounded-xl p-3 text-sm focus:border-blue-500 outline-none text-gray-300 resize-none h-32" placeholder="在此粘贴面试题目 (例如：请做个自我介绍)..."></textarea>
                     </div>
 
-                    <div class="flex items-center gap-8">
-                        <div class="relative group">
-                            <input type="file" id="file-upload" accept="audio/*" class="hidden">
-                            <button onclick="document.getElementById('file-upload').click()" class="w-14 h-14 rounded-full bg-slate-700 hover:bg-slate-600 text-gray-300 flex items-center justify-center transition-all border border-slate-600 group-hover:border-blue-500">
-                                <i class="ri-upload-cloud-2-line text-xl"></i>
-                            </button>
-                            <span class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs text-gray-500 w-max opacity-0 group-hover:opacity-100 transition-opacity">上传录音</span>
+                    <div class="w-1/2 flex flex-col gap-2 relative">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase">你的简历</h3>
+                            <div class="flex items-center gap-2">
+                                <span id="resume-file-name" class="text-xs text-green-400 hidden truncate max-w-[100px]"></span>
+                                <input type="file" id="resume-pdf-upload" accept=".pdf" class="hidden">
+                                <button onclick="document.getElementById('resume-pdf-upload').click()" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-blue-300 flex items-center gap-1 transition">
+                                    <i class="ri-file-pdf-line"></i> 上传PDF
+                                </button>
+                            </div>
                         </div>
+                        <textarea id="resume-input" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl p-3 text-sm focus:border-green-500 outline-none text-gray-300 resize-none h-32" placeholder="粘贴文本，或点击上方按钮上传 PDF..."></textarea>
+                    </div>
+                </div>
 
-                        <button id="record-btn" class="w-24 h-24 rounded-full bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/50 flex items-center justify-center transition-all">
-                            <i id="mic-icon" class="ri-mic-fill text-4xl text-white"></i>
+                <div class="flex justify-center items-center gap-4">
+                    <button id="record-btn" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-full text-lg font-bold shadow-lg shadow-blue-500/20 transition-all active:scale-95">
+                        <i id="mic-icon" class="ri-mic-line"></i> <span id="record-text">开始回答</span>
+                    </button>
+                    <span class="text-gray-600 text-sm">或</span>
+                    <div class="relative">
+                        <input type="file" id="audio-upload" accept="audio/*" class="hidden">
+                        <button onclick="document.getElementById('audio-upload').click()" class="bg-slate-700 hover:bg-slate-600 text-gray-300 px-4 py-3 rounded-full text-sm font-medium transition flex items-center gap-2">
+                            <i class="ri-upload-cloud-2-line"></i> 上传录音
                         </button>
+                    </div>
+                </div>
+                <p id="status-text" class="text-center text-gray-500 text-xs mt-3">准备好后点击录音，回答刚才的问题</p>
+            </div>
 
-                        <div class="relative group">
-                            <button onclick="window.location.reload()" class="w-14 h-14 rounded-full bg-slate-700 hover:bg-slate-600 text-gray-300 flex items-center justify-center transition-all border border-slate-600 group-hover:border-red-500">
-                                <i class="ri-refresh-line text-xl"></i>
-                            </button>
-                            <span class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs text-gray-500 w-max opacity-0 group-hover:opacity-100 transition-opacity">刷新重置</span>
-                        </div>
+            <div id="loading" class="hidden text-center py-20">
+                <div class="inline-block w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p class="text-blue-400 animate-pulse">DeepSeek 正在解析 PDF 并深度思考...</p>
+                <p class="text-xs text-gray-500 mt-2">Connecting to Knowledge Base...</p>
+            </div>
+
+            <div id="result-panel" class="hidden space-y-6 fade-in">
+                <div class="text-center mb-4">
+                    <div class="inline-flex items-end gap-2">
+                        <span id="score-display" class="text-6xl font-black text-blue-400">--</span>
+                        <span class="text-xl text-gray-500 mb-2">/ 100</span>
+                    </div>
+                    <div id="level-badge" class="inline-block bg-blue-900/30 text-blue-300 text-xs px-3 py-1 rounded-full border border-blue-500/30 ml-3 align-top mt-4">
+                        评估中...
                     </div>
                 </div>
 
-                <div id="result-panel" class="hidden space-y-6 animate-fade-in-up">
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-400 text-sm uppercase font-bold">综合得分</p>
-                                <h3 id="total-score" class="text-4xl font-bold text-white mt-1">--</h3>
-                            </div>
-                            <div id="score-ring" class="w-16 h-16 rounded-full border-4 border-slate-600 flex items-center justify-center">
-                                <span class="text-xl">🏆</span>
-                            </div>
-                        </div>
-                        
-                        <div class="md:col-span-2 bg-slate-800 p-6 rounded-2xl border border-slate-700 h-32 overflow-y-auto">
-                            <p class="text-xs text-gray-500 uppercase font-bold mb-2 sticky top-0 bg-slate-800">Transcript</p>
-                            <div id="transcription-box" class="text-gray-300 text-sm leading-relaxed">...</div>
-                        </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-[380px]">
+                    <div class="bg-[#162032] border border-slate-700 rounded-2xl p-4 flex flex-col">
+                        <h3 class="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">7维能力模型</h3>
+                        <div class="flex-1 relative"><canvas id="radarChart"></canvas></div>
                     </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-                            <canvas id="radarChart"></canvas>
-                        </div>
-                        
-                        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex flex-col">
-                            <h3 class="text-gray-400 text-sm uppercase font-bold mb-4 flex items-center gap-2">
-                                <i class="ri-openai-fill text-green-500"></i> Link 助理点评
-                            </h3>
-                            <div id="ai-feedback" class="text-gray-300 text-sm leading-relaxed flex-1 whitespace-pre-line">
-                                分析结果将显示在这里...
-                            </div>
-                        </div>
+                    <div class="bg-[#162032] border border-slate-700 rounded-2xl p-6 flex flex-col">
+                        <h3 class="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">能力强弱排序</h3>
+                        <div class="flex-1 w-full relative"><canvas id="barChart"></canvas></div>
                     </div>
                 </div>
 
-                <div id="loading-spinner" class="hidden py-12 text-center">
-                    <div class="inline-block w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-                    <p class="text-blue-400 animate-pulse">DeepSeek 正在根据 JD 和知识库深度思考...</p>
-                    <p class="text-xs text-gray-500 mt-2">Connecting to Knowledge Base...</p>
+                <div class="bg-[#162032] border border-slate-700 rounded-2xl p-8 shadow-xl">
+                    <h3 class="text-lg font-bold text-white mb-6 border-l-4 border-blue-500 pl-3">面试复盘 & 逐字稿纠错</h3>
+                    <div class="space-y-8">
+                        <div class="flex gap-4">
+                            <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center shrink-0 border border-slate-600">
+                                <i class="ri-user-star-line text-gray-300"></i>
+                            </div>
+                            <div class="max-w-[80%]">
+                                <p class="text-xs text-gray-500 mb-1 ml-1">面试官提问</p>
+                                <div id="question-bubble" class="bg-slate-800 text-gray-200 px-5 py-3 rounded-2xl rounded-tl-none border border-slate-700 leading-relaxed shadow-sm">
+                                    （未填写题目）
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-4 flex-row-reverse">
+                            <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-900/50">
+                                <span class="font-bold text-white text-xs">ME</span>
+                            </div>
+                            <div class="text-right max-w-[85%]">
+                                <p class="text-xs text-gray-500 mb-1 mr-1">你的回答 (AI 已红笔批改)</p>
+                                <div id="transcript-box" class="bg-blue-900/20 text-gray-100 px-6 py-4 rounded-2xl rounded-tr-none text-left leading-relaxed border border-blue-500/30 text-[15px] shadow-sm"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-10 pt-6 border-t border-slate-700/50">
+                        <h4 class="text-sm font-bold text-yellow-500 mb-4 flex items-center gap-2">
+                            <i class="ri-lightbulb-flash-line"></i> 改进建议 (Actionable Items)
+                        </h4>
+                        <ul id="suggestion-list" class="space-y-3 text-sm text-gray-400"></ul>
+                    </div>
                 </div>
             </div>
+            <div class="h-20"></div>
         </div>
     </div>
 
     <script>
+        let radarChartInstance = null;
+        let barChartInstance = null;
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
 
-        // DOM 元素
         const recordBtn = document.getElementById('record-btn');
+        const audioUpload = document.getElementById('audio-upload');
+        // 🔥 修正点：获取新增的 PDF 元素
+        const resumePdfUpload = document.getElementById('resume-pdf-upload');
+        const jdInput = document.getElementById('jd-input');
+        const resumeInput = document.getElementById('resume-input');
+        const questionBubble = document.getElementById('question-bubble');
         const micIcon = document.getElementById('mic-icon');
         const statusText = document.getElementById('status-text');
-        const resultPanel = document.getElementById('result-panel');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const fileUpload = document.getElementById('file-upload');
-        
-        // --- 1. 初始化图表 ---
-        let radarChart;
-        function initChart(data = [0,0,0,0,0,0,0]) {
+
+        // 🔥 修正点：添加了 PDF 选择监听逻辑
+        resumePdfUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const nameLabel = document.getElementById('resume-file-name');
+                nameLabel.innerText = "📄 " + file.name;
+                nameLabel.classList.remove('hidden');
+                resumeInput.placeholder = "已上传 PDF 简历，下方文本可留空，或作为补充说明。";
+            }
+        });
+
+        function toggleMode(mode) {
+            if (mode === 'mock') {
+                jdInput.placeholder = "在此粘贴面试题目 (例如：请做个自我介绍)...";
+            } else {
+                jdInput.placeholder = "上传模式下，AI 将自动分析录音内容...";
+            }
+        }
+
+        function renderRadar(scores) {
             const ctx = document.getElementById('radarChart').getContext('2d');
-            if(radarChart) radarChart.destroy();
-            radarChart = new Chart(ctx, {
+            if (radarChartInstance) radarChartInstance.destroy();
+            radarChartInstance = new Chart(ctx, {
                 type: 'radar',
                 data: {
-                    labels: ['业务洞察', '产品设计', '逻辑思维', '沟通表达', '项目管理', '抗压能力', '软素质'],
+                    labels: ['业务感', '产品力', '逻辑思维', '沟通能力', '项目管理', '抗压能力', '软技能'],
                     datasets: [{
-                        label: '能力模型',
-                        data: data,
-                        backgroundColor: 'rgba(37, 99, 235, 0.2)',
-                        borderColor: '#2563eb',
-                        pointBackgroundColor: '#2563eb',
-                        pointBorderColor: '#fff',
-                        borderWidth: 2
+                        label: '得分', data: scores,
+                        backgroundColor: 'rgba(59, 130, 246, 0.25)', borderColor: '#3b82f6',
+                        pointBackgroundColor: '#3b82f6', pointBorderColor: '#fff', borderWidth: 2
                     }]
                 },
                 options: {
-                    scales: {
-                        r: {
-                            angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            pointLabels: { color: '#94a3b8', font: {size: 11} },
-                            suggestedMin: 0, suggestedMax: 100
-                        }
-                    },
-                    plugins: { legend: { display: false } }
+                    maintainAspectRatio: false,
+                    scales: { r: { angleLines: {color:'rgba(255,255,255,0.1)'}, grid: {color:'rgba(255,255,255,0.05)'}, pointLabels: {color:'#94a3b8', font:{size:11}}, suggestedMin: 0, suggestedMax: 100, ticks: {display: false, stepSize: 20} } },
+                    plugins: { legend: {display: false} }
                 }
             });
         }
-        initChart();
 
-        // --- 2. 核心逻辑: 发送数据到后端 ---
-        async function analyzeData(audioBlob) {
-            // UI 切换到 Loading
-            resultPanel.classList.add('hidden');
-            loadingSpinner.classList.remove('hidden');
-            statusText.innerText = "正在分析中...";
+        function renderBarChart(dimensions) {
+            const ctx = document.getElementById('barChart').getContext('2d');
+            if (barChartInstance) barChartInstance.destroy();
+            const sortedData = Object.entries(dimensions).sort(([,a], [,b]) => b - a);
+            barChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedData.map(([key]) => key),
+                    datasets: [{
+                        data: sortedData.map(([,v]) => v),
+                        backgroundColor: c => c.raw >= 80 ? '#22c55e' : (c.raw >= 60 ? '#3b82f6' : '#ef4444'),
+                        borderRadius: 4, barThickness: 15
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', maintainAspectRatio: false,
+                    scales: { x: {display: false, max: 100}, y: {grid: {display: false}, ticks: {color: '#cbd5e1'}} },
+                    plugins: { legend: {display: false} }
+                }
+            });
+        }
+
+        function renderTranscript(text, corrections) {
+            let html = text;
+            if (corrections && corrections.length > 0) {
+                corrections.forEach(item => {
+                    const className = item.type === 'critical' ? 'highlight-critical' : 'highlight-warning';
+                    const safeQuote = item.quote.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    try {
+                        const regex = new RegExp(safeQuote, 'g');
+                        html = html.replace(regex, `<span class="${className}" data-reason="${item.reason}">${item.quote}</span>`);
+                    } catch(e) {}
+                });
+            }
+            document.getElementById('transcript-box').innerHTML = html;
+        }
+
+        async function sendData(audioBlob) {
+            document.getElementById('setup-panel').classList.add('opacity-50', 'pointer-events-none');
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('result-panel').classList.add('hidden');
+            statusText.innerText = "分析中...";
 
             const formData = new FormData();
-            formData.append("file", audioBlob, "upload.wav");
+            formData.append("file", audioBlob, "input.wav");
             
-            // 🔥 获取左侧文本框的内容 🔥
-            const jdText = document.getElementById('jd-input').value;
-            const resumeText = document.getElementById('resume-input').value;
-            formData.append("jd_text", jdText);
-            formData.append("resume_text", resumeText);
+            const qText = jdInput.value.trim();
+            formData.append("jd_text", qText || "通用面试场景");
+            formData.append("resume_text", resumeInput.value);
+
+            // 🔥 修正点：这里增加了将 PDF 文件放入请求的逻辑
+            const pdfFile = resumePdfUpload.files[0];
+            if (pdfFile) {
+                formData.append("resume_file", pdfFile);
+            }
 
             try {
-                // 发送请求
-                const response = await fetch("http://127.0.0.1:8000/analyze_audio", {
-                    method: "POST",
-                    body: formData
-                });
-                const data = await response.json();
-
+                const res = await fetch("http://127.0.0.1:8000/analyze_audio", { method: "POST", body: formData });
+                const data = await res.json();
+                
                 if (data.status === "success") {
-                    renderResult(data);
+                    const analysis = data.ai_analysis;
+                    document.getElementById('score-display').innerText = analysis.total_score;
+                    document.getElementById('level-badge').innerText = analysis.level_assessment || "评估完成";
+                    renderRadar(Object.values(analysis.dimensions));
+                    renderBarChart(analysis.dimensions);
+                    if(qText) questionBubble.innerText = qText;
+                    renderTranscript(data.transcription, analysis.transcript_correction);
+                    const list = document.getElementById('suggestion-list');
+                    if (analysis.improvement_suggestions) {
+                        list.innerHTML = analysis.improvement_suggestions.map(s => `<li class="flex gap-2 bg-slate-800/50 p-2 rounded border border-slate-700/50"><span class="text-blue-500 mt-0.5">•</span> <span>${s}</span></li>`).join('');
+                    }
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('result-panel').classList.remove('hidden');
                 } else {
                     alert("错误: " + data.message);
+                    document.getElementById('loading').classList.add('hidden');
                 }
-            } catch (error) {
-                console.error(error);
-                alert("无法连接后端，请检查 uvicorn 是否运行！");
+            } catch (err) {
+                alert("请求失败，请确保后端已启动！");
+                document.getElementById('loading').classList.add('hidden');
             } finally {
-                loadingSpinner.classList.add('hidden');
-                statusText.innerText = "分析完成";
+                document.getElementById('setup-panel').classList.remove('opacity-50', 'pointer-events-none');
+                statusText.innerText = "准备就绪";
             }
         }
 
-        // --- 3. 结果渲染 ---
-        function renderResult(data) {
-            resultPanel.classList.remove('hidden');
-            
-            // 文本高亮
-            let htmlText = data.transcription;
-            if (data.ai_analysis.annotations) {
-                data.ai_analysis.annotations.forEach(anno => {
-                    htmlText = htmlText.replace(anno.quote, 
-                        `<span class="highlight-critical" title="${anno.comment}">${anno.quote}</span>`);
-                });
-            }
-            document.getElementById('transcription-box').innerHTML = htmlText;
-
-            // 分数更新
-            const dims = data.ai_analysis.dimensions || {};
-            const scores = [
-                dims.business || 0, dims.product || 0, dims.logic || 0, 
-                dims.communication || 0, dims.project || 0, dims.stress || 0, dims.soft_skills || 0
-            ];
-            initChart(scores);
-
-            const totalScore = data.ai_analysis.total_score || 0;
-            document.getElementById('total-score').innerText = totalScore;
-            
-            // 动态分数颜色
-            const ring = document.getElementById('score-ring');
-            ring.style.borderColor = totalScore >= 80 ? '#22c55e' : (totalScore >= 60 ? '#eab308' : '#ef4444');
-            document.getElementById('total-score').className = `text-4xl font-bold mt-1 ${totalScore >= 80 ? 'text-green-400' : (totalScore >= 60 ? 'text-yellow-400' : 'text-red-400')}`;
-
-            // 点评
-            document.getElementById('ai-feedback').innerText = data.ai_analysis.feedback_summary;
-        }
-
-        // --- 4. 录音功能实现 ---
+        // 录音逻辑
         recordBtn.addEventListener('click', async () => {
             if (!isRecording) {
                 try {
@@ -262,39 +334,31 @@
                     mediaRecorder = new MediaRecorder(stream);
                     audioChunks = [];
                     mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                    
                     mediaRecorder.onstop = () => {
                         const blob = new Blob(audioChunks, { type: 'audio/wav' });
-                        analyzeData(blob);
+                        sendData(blob);
                     };
-
                     mediaRecorder.start();
                     isRecording = true;
-                    
-                    // 样式变为录音中
                     recordBtn.classList.remove('bg-blue-600');
-                    recordBtn.classList.add('bg-red-600', 'recording-pulse');
-                    micIcon.className = "ri-stop-fill text-4xl text-white";
-                    statusText.innerText = "正在录音... (点击停止)";
-                } catch (err) {
-                    alert("麦克风权限被拒绝 🎤");
-                }
+                    recordBtn.classList.add('bg-red-500', 'recording-pulse');
+                    document.getElementById('record-text').innerText = "停止并分析";
+                    micIcon.className = "ri-stop-line";
+                    statusText.innerText = "录音中...";
+                } catch (e) { alert("麦克风权限被拒绝"); }
             } else {
                 mediaRecorder.stop();
                 isRecording = false;
-                recordBtn.classList.remove('bg-red-600', 'recording-pulse');
+                recordBtn.classList.remove('bg-red-500', 'recording-pulse');
                 recordBtn.classList.add('bg-blue-600');
-                micIcon.className = "ri-mic-fill text-4xl text-white";
+                document.getElementById('record-text').innerText = "开始回答";
+                micIcon.className = "ri-mic-line";
             }
         });
 
-        // --- 5. 文件上传功能实现 ---
-        fileUpload.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                const file = e.target.files[0];
-                statusText.innerText = `正在分析文件: ${file.name}`;
-                analyzeData(file);
-            }
+        // 音频文件上传逻辑
+        audioUpload.addEventListener('change', (e) => {
+            if(e.target.files.length > 0) sendData(e.target.files[0]);
         });
     </script>
 </body>

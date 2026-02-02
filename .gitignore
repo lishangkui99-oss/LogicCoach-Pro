@@ -1,7 +1,8 @@
-__pycache__/
-*.py[cod]
-venv/
 .env
+backend/.env
+venv/
+__pycache__/
 chroma_db/
 uploads/
-.DS_Store
+*.log
+node_modules/

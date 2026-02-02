@@ -1,25 +1,82 @@
-# LogicCoach Pro 🤖
-> 基于 DeepSeek-V3 与 RAG 技术的 AI 产品经理面试教练系统。
+# LogicCoach Pro - 垂直领域的 AI 产品经理面试复盘 Agent 🤖
 
-## 核心功能
-LogicCoach Pro 旨在通过“准备-实战-复盘”的闭环逻辑，解决传统模拟面试反馈泛化的问题。
-- **👂 听觉层**: 集成 SenseVoice，支持高精度语音转文字 (ASR)。
-- **🧠 认知层**: 基于 DeepSeek-V3 模型，结合人岗匹配逻辑进行深度推理。
-- **📚 记忆层**: RAG (检索增强生成) 挂载 110+ 篇私有产品方法论，拒绝通用幻觉。
-- **📊 表现层**: 自动生成 7 维能力雷达图与逻辑纠错报告。
+> **"通用大模型给的是‘建议’，LogicCoach 给的是‘判决’。"**
+> 一个基于 RAG 架构、拒绝笼统废话、专注于**微观逻辑纠错**与**能力量化评估**的面试复盘助手。
 
-## 技术栈
-- **Backend**: Python 3.11, FastAPI
-- **AI Model**: DeepSeek-V3 (via SiliconFlow API)
-- **Vector DB**: ChromaDB
-- **Frontend**: Native HTML/JS + Chart.js
+![Dashboard Screenshot](这里放你的结果页截图路径.png)
 
-## 如何运行
-1. 克隆仓库
-2. 安装依赖: `pip install -r requirements.txt`
-3. 配置环境: 创建 `.env` 文件并填入 `API_KEY=your_key`
-4. 初始化知识库: `python backend/build_db.py`
-5. 启动服务:
-   ```bash
-   cd backend
-   uvicorn main:app --reload
+## 💡 为什么做这个项目？(The "Why")
+
+作为一名从建筑学转型 AI 产品经理的求职者，我在面试复盘中发现了两个核心痛点：
+
+1.  **通用大模型的“失忆”与“笼统”**：
+    直接把面试录音丢给 ChatGPT，它往往只能给出“逻辑清晰、表达流畅”等**万金油式的评价**。它不知道 AI 产品岗位的具体考核标准，也无法根据我过往学习过的（但可能遗忘的）具体知识点进行针对性纠错。
+
+2.  **复盘颗粒度不够**：
+    大多数人不知道自己“挂”在哪里。是**商业思维**不够？还是**技术理解**（如 RAG/Agent 原理）有偏差？
+
+**LogicCoach Pro 的核心使命**：利用 **RAG（私有知识库）** 将通用的推理能力“锚定”在具体的 **AI 产品经理能力模型**上，把模糊的“感觉”变成精确的“红黄线”标注。
+
+## ✨ 核心解决方案 (Core Solutions)
+
+### 1. 🎯 7维能力雷达图 (Competency Radar)
+> *解决问题：面试评价标准不透明、无法量化。*
+
+我梳理了过往学习的 **100+ 篇 AI 产品方法论与大厂 JD**，提炼出 AI 产品经理必考的 **7 大核心素质**（如业务感、技术理解力、逻辑思维等）。
+* **功能实现**：每次回答后，Agent 不会只给总分，而是基于这 7 个维度生成雷达图与强弱排序，让你一眼看出今天的回答是“由于技术理解偏差导致失分”还是“沟通结构混乱”。
+
+### 2. 📝 基于知识库的“红黄线”精准批改 (Precision Highlighting)
+> *解决问题：大模型反馈过于温和，缺乏针对性。*
+
+利用 **DeepSeek-V3** 结合本地向量数据库（ChromaDB），对你的语音逐字稿进行微观扫描：
+* **🔴 红线（Critical）**：**逻辑硬伤或知识盲区**。
+    * *示例*：当你提到“大模型幻觉”却没能说出“RAG”或“微调”等具体解法时，系统会直接标红，并引用知识库中的标准答案指出缺失。
+* **🟡 黄线（Warning）**：**表达缺陷或黑话堆砌**。
+    * *示例*：当你空谈“赋能、闭环”却无 Case 支撑时，系统会高亮预警，提示补充数据或落地细节。
+* **💡 解决方案输出**：不只是指出错误，还会根据你的失分点，直接从知识库中检索并输出对应的**改进方案**。
+
+## 📅 产品规划 (Roadmap)
+
+LogicCoach Pro 致力于打造面试全流程的闭环体验：
+
+- [x] **MVP 阶段 (已完成)**：
+    - [x] 支持音频/PDF简历多模态输入。
+    - [x] 实现 RAG 检索与 7 维能力打分。
+    - [x] 逐字稿红黄线高亮与致命追问生成。
+- [ ] **2.0 阶段 (开发中)**：
+    - [ ] **面试前 - 模拟沙盘**：根据上传的 JD，利用 Agent 自动生成 3 组高频模拟题（含压力面场景）。
+    - [ ] **面试后 - 长期追踪**：建立用户能力成长曲线，追踪 7 维能力的长期变化趋势。
+
+## 🛠 技术架构 (Tech Stack)
+
+这是一个 **Full-Stack** 的 LLM 原生应用：
+
+* **核心大脑**: DeepSeek-V3 (via SiliconFlow API) - *负责复杂逻辑推理与评分*
+* **知识中枢**: RAG (Retrieval-Augmented Generation) - *基于 ChromaDB 挂载 110+ 篇垂直领域干货*
+* **听觉中枢**: FunAudioLLM/SenseVoiceSmall - *高精度语音转文字*
+* **视觉交互**: HTML5 + TailwindCSS + Chart.js - *雷达图与交互式逐字稿渲染*
+* **工程底座**: Python (FastAPI) + Uvicorn
+
+## 🚀 如何运行 (Quick Start)
+
+1. **环境准备**
+\`\`\`bash
+git clone https://github.com/你的用户名/LogicCoach-Pro.git
+pip install -r requirements.txt
+\`\`\`
+
+2. **配置密钥**
+在根目录新建 `.env` 文件：
+\`\`\`text
+API_KEY=sk-xxxxxx
+\`\`\`
+
+3. **启动服务**
+\`\`\`bash
+cd backend
+uvicorn main:app --reload
+\`\`\`
+访问 http://127.0.0.1:8000 开始深度复盘。
+
+---
+*Created by Li Shangkui. 2026.*
