@@ -5,6 +5,11 @@
 
 ![Dashboard Screenshot](这里放你的结果页截图路径.png)
 
+## 📌 文档导航
+
+- 招聘方速览版（中文）：[README_RECRUITER.md](README_RECRUITER.md)
+- English Overview: [README_EN.md](README_EN.md)
+
 ## 💡 为什么做这个项目？(The "Why")
 
 作为一名从建筑学转型 AI 产品经理的求职者，我在面试复盘中发现了两个核心痛点：
