@@ -24,12 +24,15 @@ export default function Home() {
   };
 
   const startLiveSimulation = () => {
-    navigate('/interview');
+    navigate('/interview', {
+      state: { jdText: jobDescription, resumeFile: resume }
+    });
   };
 
   const uploadRecording = () => {
-    // Handle recording upload
-    navigate('/analysis');
+    navigate('/interview', {
+      state: { jdText: jobDescription, resumeFile: resume, mode: 'upload' as const }
+    });
   };
 
   return (

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Chart as ChartJS,
   RadialLinearScale,
@@ -20,15 +21,19 @@ ChartJS.register(
 );
 
 export default function InterviewCoach() {
+  const location = useLocation();
+  const navState = location.state as { jdText?: string; resumeFile?: File; mode?: 'mock' | 'upload' } | null;
+
   // --- 状态管理 ---
   const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasResult, setHasResult] = useState(false);
   
   // 输入内容
-  const [mode, setMode] = useState<'mock' | 'upload'>('mock');
-  const [jdText, setJdText] = useState('');
+  const [mode, setMode] = useState<'mock' | 'upload'>(navState?.mode || 'mock');
+  const [jdText, setJdText] = useState(navState?.jdText || '');
   const [resumeText, setResumeText] = useState('');
+  const [resumeFile, setResumeFile] = useState<File | null>(navState?.resumeFile || null);
   const [question, setQuestion] = useState(''); // 题目展示
   
   // 分析结果数据
@@ -80,6 +85,9 @@ export default function InterviewCoach() {
     formData.append("file", blob, "input.wav");
     formData.append("jd_text", jdText || (mode === 'mock' ? "通用面试" : ""));
     formData.append("resume_text", resumeText);
+    if (resumeFile) {
+      formData.append("resume_file", resumeFile, resumeFile.name);
+    }
 
     try {
       // ⚠️ 注意：这里假设你已经在 vite.config.ts 配置了代理，或者后端开启了 CORS

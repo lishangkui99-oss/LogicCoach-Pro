@@ -1,92 +1,87 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface Dimension {
   name: string;
   score: number;
 }
 
-interface TranscriptItem {
-  id: string;
-  speaker: 'ai' | 'user';
-  text: string;
-  highlights: Array<{
-    start: number;
-    end: number;
-    type: 'error' | 'warning';
-    feedback: string;
-  }>;
+interface TranscriptCorrection {
+  quote: string;
+  type: 'critical' | 'warning';
+  reason: string;
 }
+
+interface AnalysisData {
+  total_score: number;
+  level_assessment: string;
+  dimensions: Record<string, number>;
+  transcript_correction: TranscriptCorrection[];
+  improvement_suggestions: string[];
+}
+
+interface LocationState {
+  transcription?: string;
+  ai_analysis?: AnalysisData;
+}
+
+const MOCK_ANALYSIS: AnalysisData = {
+  total_score: 82,
+  level_assessment: '资深产品经理级别',
+  dimensions: {
+    '业务感': 88, '产品力': 85, '逻辑思维': 82,
+    '沟通能力': 78, '项目管理': 75, '抗压能力': 72, '软技能': 68,
+  },
+  transcript_correction: [
+    { quote: '我做过一个很成功的项目，这个项目很受用户欢迎，我们团队合作得很好，最后取得了不错的成绩', type: 'critical', reason: '太泛泛，缺乏数据支撑和具体细节' },
+    { quote: '不过我们通过敏捷开发的方式解决了', type: 'warning', reason: '可以补充具体的敏捷实践方法' },
+  ],
+  improvement_suggestions: [
+    '🔥 [致命追问]: 你提到"很成功的项目"，请给出具体的DAU/MAU、转化率等数据指标',
+    '💡 [知识库引用]: 建议使用STAR法则重新组织回答结构',
+    '✨ [优化建议]: 补充项目背景和你的个人贡献，避免"我们团队"的模糊表述',
+  ],
+};
+
+const MOCK_TRANSCRIPTION = '请详细介绍一下你最成功的产品项目。我做过一个很成功的项目，这个项目很受用户欢迎，我们团队合作得很好，最后取得了不错的成绩。能具体说说你在项目中遇到的最大挑战吗？最大的挑战是需求变化比较频繁，不过我们通过敏捷开发的方式解决了。我们每周都会开会讨论进度。';
 
 export default function Analysis() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const state = location.state as LocationState | null;
+
+  const analysis = state?.ai_analysis || MOCK_ANALYSIS;
+  const transcription = state?.transcription || MOCK_TRANSCRIPTION;
+
   const [selectedFeedback, setSelectedFeedback] = useState<string | null>(null);
   const [feedbackPosition, setFeedbackPosition] = useState({ x: 0, y: 0 });
 
-  const dimensions: Dimension[] = [
-    { name: '业务感', score: 88 },
-    { name: '产品力', score: 85 },
-    { name: '逻辑思维', score: 82 },
-    { name: '沟通能力', score: 78 },
-    { name: '项目管理', score: 75 },
-    { name: '抗压能力', score: 72 },
-    { name: '软技能', score: 68 },
-  ];
+  const dimensionKeys = ['业务感', '产品力', '逻辑思维', '沟通能力', '项目管理', '抗压能力', '软技能'];
+  const dimensions: Dimension[] = dimensionKeys.map(name => ({
+    name,
+    score: analysis.dimensions[name] || 0,
+  }));
 
   const sortedDimensions = [...dimensions].sort((a, b) => b.score - a.score);
 
-  const transcript: TranscriptItem[] = [
-    {
-      id: '1',
-      speaker: 'ai',
-      text: '请详细介绍一下你最成功的产品项目。',
-      highlights: [],
-    },
-    {
-      id: '2',
-      speaker: 'user',
-      text: '我做过一个很成功的项目，这个项目很受用户欢迎，我们团队合作得很好，最后取得了不错的成绩。',
-      highlights: [
-        { start: 0, end: 50, type: 'error', feedback: '太泛泛，缺乏数据支撑和具体细节' },
-      ],
-    },
-    {
-      id: '3',
-      speaker: 'ai',
-      text: '能具体说说你在项目中遇到的最大挑战吗？',
-      highlights: [],
-    },
-    {
-      id: '4',
-      speaker: 'user',
-      text: '最大的挑战是需求变化比较频繁，不过我们通过敏捷开发的方式解决了。我们每周都会开会讨论进度。',
-      highlights: [
-        { start: 30, end: 50, type: 'warning', feedback: '可以补充具体的敏捷实践方法' },
-      ],
-    },
-    {
-      id: '5',
-      speaker: 'ai',
-      text: '你如何衡量这个产品的成功？',
-      highlights: [],
-    },
-    {
-      id: '6',
-      speaker: 'user',
-      text: '我们的产品上线后，用户增长达到了 300%，日活从 5000 提升到 2 万，用户留存率提升了 45%，NPS 评分达到 72 分。同时，我们将核心功能的转化率从 8% 优化到 23%。',
-      highlights: [],
-    },
-  ];
+  const buildHighlightedHtml = (text: string, corrections: TranscriptCorrection[]) => {
+    let html = text;
+    corrections.forEach((item) => {
+      const colorClass = item.type === 'critical'
+        ? 'border-b-2 border-dashed border-red-500 bg-red-500/10 cursor-help'
+        : 'border-b-2 border-dashed border-yellow-500 bg-yellow-500/10 cursor-help';
+      const escapedReason = item.reason.replace(/"/g, '&quot;');
+      html = html.replace(item.quote, `<span class="${colorClass}" title="${escapedReason}">${item.quote}</span>`);
+    });
+    return html;
+  };
+
+  const transcriptHtml = buildHighlightedHtml(transcription, analysis.transcript_correction);
 
   const handleHighlightClick = (feedback: string, event: React.MouseEvent) => {
     const rect = (event.target as HTMLElement).getBoundingClientRect();
     setFeedbackPosition({ x: rect.left, y: rect.top - 10 });
     setSelectedFeedback(feedback);
-  };
-
-  const handleFeedbackAction = (action: string) => {
-    console.log(`Feedback action: ${action}`);
-    setSelectedFeedback(null);
   };
 
   return (
@@ -115,12 +110,12 @@ export default function Analysis() {
         {/* Score Header */}
         <div className="text-center space-y-4">
           <div className="inline-flex items-baseline gap-2">
-            <span className="text-7xl font-bold text-white">82</span>
+            <span className="text-7xl font-bold text-white">{analysis.total_score}</span>
             <span className="text-3xl text-slate-400">/100</span>
           </div>
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600/20 border border-blue-500/30 rounded-full">
             <i className="ri-medal-line text-blue-400"></i>
-            <span className="text-sm font-medium text-blue-300">资深产品经理级别</span>
+            <span className="text-sm font-medium text-blue-300">{analysis.level_assessment}</span>
           </div>
         </div>
 
@@ -131,7 +126,6 @@ export default function Analysis() {
             <h3 className="text-lg font-semibold text-white mb-6">7维能力雷达图</h3>
             <div className="relative w-full aspect-square max-w-md mx-auto">
               <svg viewBox="0 0 400 400" className="w-full h-full">
-                {/* Background circles */}
                 {[0.2, 0.4, 0.6, 0.8, 1].map((scale, i) => (
                   <polygon
                     key={i}
@@ -144,7 +138,6 @@ export default function Analysis() {
                   />
                 ))}
                 
-                {/* Axis lines */}
                 {dimensions.map((_, i) => {
                   const angle = (i * 360) / 7 - 90;
                   const x = 200 + 150 * Math.cos((angle * Math.PI) / 180);
@@ -163,7 +156,6 @@ export default function Analysis() {
                   );
                 })}
 
-                {/* Data polygon */}
                 <polygon
                   points={dimensions
                     .map((d, i) => {
@@ -180,7 +172,6 @@ export default function Analysis() {
                   strokeWidth="2"
                 />
 
-                {/* Data points */}
                 {dimensions.map((d, i) => {
                   const angle = (i * 360) / 7 - 90;
                   const distance = (d.score / 100) * 150;
@@ -199,7 +190,6 @@ export default function Analysis() {
                   );
                 })}
 
-                {/* Labels */}
                 {dimensions.map((d, i) => {
                   const angle = (i * 360) / 7 - 90;
                   const x = 200 + 180 * Math.cos((angle * Math.PI) / 180);
@@ -227,7 +217,7 @@ export default function Analysis() {
           <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-white mb-6">能力排序</h3>
             <div className="space-y-4">
-              {sortedDimensions.map((dimension, index) => (
+              {sortedDimensions.map((dimension) => (
                 <div key={dimension.name} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-300 font-medium">{dimension.name}</span>
@@ -245,61 +235,29 @@ export default function Analysis() {
           </div>
         </div>
 
-        {/* Transcript & Feedback Section */}
+        {/* Transcript with highlights */}
         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
           <h3 className="text-lg font-semibold text-white mb-6">面试逐字稿 & 反馈</h3>
-          <div className="space-y-6">
-            {transcript.map((item) => (
-              <div key={item.id} className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`text-xs font-semibold px-2 py-1 rounded ${
-                      item.speaker === 'ai'
-                        ? 'bg-slate-700 text-slate-300'
-                        : 'bg-blue-600/20 text-blue-300'
-                    }`}
-                  >
-                    {item.speaker === 'ai' ? 'AI 面试官' : '候选人'}
-                  </span>
-                </div>
-                <div className="text-sm text-slate-200 leading-relaxed">
-                  {item.highlights.length === 0 ? (
-                    <span>{item.text}</span>
-                  ) : (
-                    <>
-                      {item.highlights.map((highlight, idx) => {
-                        const before = item.text.slice(
-                          idx === 0 ? 0 : item.highlights[idx - 1].end,
-                          highlight.start
-                        );
-                        const highlighted = item.text.slice(highlight.start, highlight.end);
-                        const isLast = idx === item.highlights.length - 1;
-                        const after = isLast ? item.text.slice(highlight.end) : '';
-
-                        return (
-                          <span key={idx}>
-                            {before}
-                            <span
-                              className={`relative px-1 rounded cursor-pointer ${
-                                highlight.type === 'error'
-                                  ? 'bg-red-500/30 hover:bg-red-500/40'
-                                  : 'bg-yellow-500/30 hover:bg-yellow-500/40'
-                              }`}
-                              onClick={(e) => handleHighlightClick(highlight.feedback, e)}
-                            >
-                              {highlighted}
-                            </span>
-                            {after}
-                          </span>
-                        );
-                      })}
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          <div
+            className="text-sm text-slate-200 leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: transcriptHtml }}
+          />
         </div>
+
+        {/* Improvement Suggestions */}
+        {analysis.improvement_suggestions.length > 0 && (
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-yellow-500 mb-4">改进建议</h3>
+            <ul className="space-y-3 text-sm text-slate-300">
+              {analysis.improvement_suggestions.map((s, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="text-blue-500 shrink-0">•</span>
+                  <span>{s}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </main>
 
       {/* Feedback Tooltip */}
@@ -317,30 +275,7 @@ export default function Analysis() {
               transform: 'translate(-50%, -100%)',
             }}
           >
-            <p className="text-sm text-slate-200 mb-3">{selectedFeedback}</p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleFeedbackAction('thumbup')}
-                className="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-700 transition-colors cursor-pointer"
-                title="有帮助"
-              >
-                <i className="ri-thumb-up-line text-slate-400 hover:text-green-400"></i>
-              </button>
-              <button
-                onClick={() => handleFeedbackAction('thumbdown')}
-                className="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-700 transition-colors cursor-pointer"
-                title="没帮助"
-              >
-                <i className="ri-thumb-down-line text-slate-400 hover:text-red-400"></i>
-              </button>
-              <button
-                onClick={() => handleFeedbackAction('edit')}
-                className="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-700 transition-colors cursor-pointer"
-                title="编辑反馈"
-              >
-                <i className="ri-edit-line text-slate-400 hover:text-blue-400"></i>
-              </button>
-            </div>
+            <p className="text-sm text-slate-200">{selectedFeedback}</p>
           </div>
         </>
       )}
