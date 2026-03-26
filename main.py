@@ -14,12 +14,17 @@ import nest_asyncio
 from backend.services.document_processing import extract_document_content, extract_profile_json
 from backend.services.rag_pipeline import (
     ENABLE_WEB_RAG,
+  apply_intent_rag_routing,
     call_agent_browser_skill,
     retrieve_local_docs_for_segments,
     reflect_distill_batch,
     integrate_web_batch,
 )
-from backend.services.scout_coach import run_scout_agent
+from backend.services.scout_coach import (
+    build_dynamic_evaluation_criteria,
+    run_scout_agent,
+    scan_interview_intent,
+)
 
 load_dotenv()
 nest_asyncio.apply()      # [新增] 必须在导入后立即调用，防止 FastAPI 异步事件循环冲突
@@ -151,6 +156,16 @@ async def analyze_audio(
     except Exception as e:
         return {"status": "error", "message": f"听写失败: {str(e)}"}
 
+    # --- Step 2.5: 全局意图识别（轻量级路由前置） ---
+    intent_label = "未识别"
+    try:
+        intent_label = scan_interview_intent(client, SCOUT_MODEL, user_text)
+        print(f"🧭 [2.5/4] 全局意图识别结果: {intent_label}")
+    except Exception as e:
+        # 兜底：任何异常都不影响原有主流程
+        print(f"⚠️ [2.5/4] 意图识别失败，回退未识别: {e}")
+        intent_label = "未识别"
+
     # --- Step 3: 呼叫面试侦察兵 (Scout Agent) ---
     print("🕵️‍♂️ [3/4] 启动侦察兵节点，分析文本脉络...")
     scout_result = run_scout_agent(
@@ -168,8 +183,27 @@ async def analyze_audio(
     global_focus_str = "\n".join([f"- {focus}" for focus in scout_result.get("global_focus", [])])
 
     segments = scout_result.get("segments", []) or []
-    segment_docs = retrieve_local_docs_for_segments(segments, knowledge_collection)
-    batch_result = reflect_distill_batch(client, SCOUT_MODEL, segment_docs)
+    rag_route_mode = "bypass"
+    batch_result = {"global_distilled": "", "segments": []}
+
+    try:
+      if intent_label in {"HR通用面", "未识别"}:
+        # HR/未识别场景：旁路专业检索，保留基础流程稳定性
+        rag_route_mode = "bypass"
+        print(f"⏭️ [BatchRAG] 当前意图={intent_label}，旁路专业知识检索。")
+      elif intent_label in {"产品专业面", "AI技术面"}:
+        # 产品/AI场景：按宽口径意图增强查询并触发检索
+        rag_route_mode = "product" if intent_label == "产品专业面" else "ai"
+        routed_segments = apply_intent_rag_routing(intent_label, segments)
+        segment_docs = retrieve_local_docs_for_segments(routed_segments, knowledge_collection)
+        batch_result = reflect_distill_batch(client, SCOUT_MODEL, segment_docs)
+      else:
+        rag_route_mode = "bypass"
+    except Exception as e:
+      # 任意路由异常回退旁路，避免影响原有主链路
+      print(f"⚠️ [BatchRAG] 路由检索失败，回落旁路模式: {e}")
+      rag_route_mode = "bypass"
+      batch_result = {"global_distilled": "", "segments": []}
 
     # 缺口时：合并 missing_queries，仅触发一次联网抓取，然后二次整合
     missing_queries = []
@@ -179,7 +213,7 @@ async def analyze_audio(
                 if isinstance(q, str) and q.strip():
                     missing_queries.append(q.strip())
 
-    if missing_queries:
+    if missing_queries and rag_route_mode != "bypass":
         uniq = []
         seen = set()
         for q in missing_queries:
@@ -257,6 +291,10 @@ async def analyze_audio(
     ======================================================
     【军师侦察报告】 (主审官，请重点参考以下切片和批注进行评估)
     ======================================================
+
+    🧭 **全局意图路由**:
+    - 意图标签: {intent_label}
+    - RAG 路由模式: {rag_route_mode}
     
     🎯 **全局核心焦点**:
     {global_focus_str}
@@ -266,8 +304,13 @@ async def analyze_audio(
     ======================================================
     """
 
-    # --- Step 4: 构建 Prompt (Link 知识助理 V4.0 - 万字深度面试教练) ---
-    system_prompt = f"""
+    # --- Step 4: 构建 Prompt (模板化 + 动态注入) ---
+    dynamic_eval_criteria = build_dynamic_evaluation_criteria(
+        intent_label,
+        (retrieved_context or "")[:300],
+    )
+
+    system_prompt_template = f"""
 # ============================================================
 # Link Knowledge Assistant V4.0 — P9+ 产品经理面试教练系统
 # ============================================================
@@ -317,6 +360,9 @@ async def analyze_audio(
 ## 1.5 当前面试上下文
 {job_context}
 {real_resume_context}
+
+## 1.6 场景动态评价准则
+{{DYNAMIC_EVALUATION_CRITERIA}}
 
 ---
 
@@ -852,6 +898,11 @@ BAT/TMD 的面试风格直接且犀利。你必须具备"红线检测雷达"，
 }}
 """
 
+    system_prompt = system_prompt_template.replace(
+        "{DYNAMIC_EVALUATION_CRITERIA}",
+        dynamic_eval_criteria,
+    )
+
     # --- Step 5: 呼叫 AI (参数已调优) ---
     print("🤖 [4/4] 主审官 Qwen3.5-122B 正在进行深度逻辑分析...")
     try:
@@ -882,6 +933,8 @@ BAT/TMD 的面试风格直接且犀利。你必须具备"红线检测雷达"，
     return {
         "status": "success",
         "transcription": user_text,
+      "intent_label": intent_label,
+      "rag_route_mode": rag_route_mode,
         "ai_analysis": ai_result
     }
 

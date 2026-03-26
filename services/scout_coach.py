@@ -3,6 +3,106 @@ import json
 from openai import OpenAI
 
 
+INTENT_LABELS = ["HR通用面", "产品专业面", "AI技术面", "未识别"]
+
+
+def _normalize_intent_label(raw_label: str) -> str:
+    text = (raw_label or "").strip()
+    if text in INTENT_LABELS:
+        return text
+
+    low = text.lower()
+    if "hr" in low or "招聘" in text or "价值观" in text or "沟通" in text:
+        return "HR通用面"
+    if "产品" in text or "需求" in text or "生命周期" in text or "商业模式" in text:
+        return "产品专业面"
+    if "ai" in low or "aigc" in low or "大模型" in text or "agent" in low or "prompt" in low:
+        return "AI技术面"
+    return "未识别"
+
+
+def scan_interview_intent(ai_client: OpenAI, scout_model: str, transcript: str) -> str:
+    """Lightweight intent scanner before main coach analysis."""
+    if not transcript or len(transcript.strip()) < 30:
+        return "未识别"
+
+    system_prompt = """
+你是面试场景意图识别器。
+只允许输出以下四个标签之一，且必须完全一致：
+- HR通用面
+- 产品专业面
+- AI技术面
+- 未识别
+
+判定规则：
+1) 软素质、沟通协作、动机价值观为主 -> HR通用面
+2) 需求分析、用户生命周期、敏捷迭代、商业模式、指标体系为主 -> 产品专业面
+3) 大模型边界、Prompt策略、路由逻辑、Agent架构、AIGC评估为主 -> AI技术面
+4) 多意图混杂或信息不足 -> 未识别
+""".strip()
+
+    try:
+        response = ai_client.chat.completions.create(
+            model=scout_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": transcript[:6000]},
+            ],
+            temperature=0.0,
+            max_tokens=16,
+        )
+        label = response.choices[0].message.content.strip()
+        return _normalize_intent_label(label)
+    except Exception as e:
+        print(f"[scout_coach] Intent scanner failed: {e}")
+        return "未识别"
+
+
+def build_dynamic_evaluation_criteria(intent_label: str, rag_reference: str = "") -> str:
+    """Build dynamic criteria to inject into system prompt template."""
+    label = _normalize_intent_label(intent_label)
+    ref = (rag_reference or "").strip()
+    ref_line = f"参考红线: {ref}" if ref else "参考红线: 暂无检索补充，优先依据逐字稿证据。"
+
+    if label == "产品专业面":
+        return (
+            "场景: 产品专业面\n"
+            "评分权重建议:\n"
+            "- 主权重 65%: 用户同理心、业务落地能力、结构化表达\n"
+            "- 次权重 35%: 数据指标意识、协作推进、复盘能力\n"
+            "评估锚点:\n"
+            "- 需求分析完整性、生命周期思维、商业闭环意识\n"
+            f"- {ref_line}"
+        )
+
+    if label == "AI技术面":
+        return (
+            "场景: AI技术面\n"
+            "评分权重建议:\n"
+            "- 主权重 65%: AI场景应用能力、系统边界认知、方案取舍\n"
+            "- 次权重 35%: 产品化表达、跨团队协同、风险意识\n"
+            "评估锚点:\n"
+            "- 大模型能力边界、Prompt策略、意图路由、Agent架构、评估标准\n"
+            f"- {ref_line}"
+        )
+
+    if label == "HR通用面":
+        return (
+            "场景: HR通用面\n"
+            "评分权重建议:\n"
+            "- 主权重 60%: 沟通表达、抗压能力、软技能\n"
+            "- 次权重 40%: 逻辑性、项目复盘质量\n"
+            f"- {ref_line}"
+        )
+
+    return (
+        "场景: 未识别\n"
+        "评分权重建议:\n"
+        "- 均衡权重: 逻辑/沟通/产品/业务综合评估\n"
+        f"- {ref_line}"
+    )
+
+
 def run_scout_agent(ai_client: OpenAI, scout_model: str, transcript: str, resume_json: dict, jd_json: dict) -> dict:
     """Split transcript and extract focus points before final coach scoring."""
     if not transcript or len(transcript) < 50:

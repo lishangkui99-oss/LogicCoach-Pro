@@ -8,6 +8,62 @@ from openai import OpenAI
 ENABLE_WEB_RAG = os.getenv("ENABLE_WEB_RAG", "false").lower() in {"1", "true", "yes", "on"}
 
 
+def apply_intent_rag_routing(intent_label: str, segments: list, *, max_queries_per_segment: int = 4) -> list:
+    """Apply broad-category routing hints to segment queries by interview intent."""
+    if not isinstance(segments, list) or not segments:
+        return []
+
+    label = (intent_label or "").strip()
+    if label not in {"产品专业面", "AI技术面"}:
+        return segments
+
+    if label == "产品专业面":
+        route_seeds = [
+            "需求分析框架",
+            "用户生命周期与增长",
+            "敏捷迭代与优先级",
+            "商业模式闭环与指标体系",
+        ]
+    else:
+        route_seeds = [
+            "大模型能力边界",
+            "Prompt工程策略",
+            "意图识别与路由逻辑",
+            "Agent架构与生成内容评估",
+        ]
+
+    routed_segments = []
+    for seg in segments:
+        if not isinstance(seg, dict):
+            continue
+
+        topic = (seg.get("topic") or "").strip()
+        original_queries = seg.get("rag_queries", []) or []
+        merged_queries = []
+        seen = set()
+
+        for q in original_queries:
+            if isinstance(q, str) and q.strip():
+                clean = q.strip()
+                if clean not in seen:
+                    seen.add(clean)
+                    merged_queries.append(clean)
+
+        for seed in route_seeds:
+            enhanced = f"{topic} {seed}".strip() if topic else seed
+            if enhanced not in seen:
+                seen.add(enhanced)
+                merged_queries.append(enhanced)
+            if len(merged_queries) >= max_queries_per_segment:
+                break
+
+        routed = dict(seg)
+        routed["rag_queries"] = merged_queries[:max_queries_per_segment]
+        routed_segments.append(routed)
+
+    return routed_segments
+
+
 def call_agent_browser_skill(query: str) -> str:
     """Use agent-browser CLI to fetch web content for missing knowledge."""
     if not ENABLE_WEB_RAG:
