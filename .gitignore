@@ -22,3 +22,12 @@
  # 5. 忽略 Cursor/VS Code 的本地配置
  .vscode/
  .cursor/
+# Local runtime data and caches
+chroma_db/
+knowledge_base/
+uploads/
+venv/
+__pycache__/
+*.sqlite3
+*.bundle
+*.patch
