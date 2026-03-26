@@ -68,10 +68,13 @@ LogicCoach Pro 致力于打造面试全流程的闭环体验：
 
 - [x] Scout-Coach 双层架构：前置侦察与最终深度分析分层执行。
 - [x] 批量 Agentic RAG：多切片本地检索后批量反思，并在缺口时触发一次联网补充。
+- [x] 面试场景意图识别与动态路由：新增 HR通用面 / 产品专业面 / AI技术面 / 未识别 四类意图判定，并按意图切换 RAG 策略。
+- [x] 动态 Prompt 注入：将静态 System Prompt 模板化，运行时注入场景权重与参考红线，增强评估针对性与可解释性。
 - [x] 文档解析模块化：简历/JD 文件解析拆分至 `backend/services/document_processing.py`。
 - [x] RAG 管线模块化：检索、反思、联网整合拆分至 `backend/services/rag_pipeline.py`。
 - [x] 健康检查接口：新增 `GET /healthz`，可直接查看 API Key、知识库与联网开关状态。
 - [x] 一键自检脚本：新增 `backend/scripts/self_test.py`，可快速检查环境与关键依赖。
+- [x] 仓库清理策略：知识库、向量库、上传文件、运行缓存改为本地保留（`.gitignore`），默认不随代码仓库上传。
 
 ## 🚀 如何运行 (Quick Start)
 

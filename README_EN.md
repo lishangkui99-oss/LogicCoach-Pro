@@ -13,14 +13,22 @@ LogicCoach Pro is an AI-native interview debrief system that turns subjective in
 - Dual-model collaboration:
   - Scout (DeepSeek-V3) for pre-analysis, segmentation, and focus extraction.
   - Coach (Qwen3.5-122B) for final deep assessment and scoring.
+- Intent-aware dynamic routing:
+  - Lightweight intent scanner classifies interview context into HR-general, Product-professional, AI-technical, or Unrecognized.
+  - RAG policy is switched by intent with safe fallbacks.
 - Agentic RAG pipeline:
   - Local retrieval from ChromaDB.
   - Batch reflection and distillation across segments.
   - Optional web augmentation when local evidence is insufficient.
+- Dynamic system prompt injection:
+  - Static prompt is templated and receives runtime evaluation criteria and knowledge anchors.
 - Structured JSON output:
   - Overall score, 7-dimension scoring, transcript-level issue tagging, and targeted suggestions.
 - Ops readiness:
   - /healthz endpoint and backend/scripts/self_test.py for fast validation.
+
+## Repository Hygiene
+- Knowledge base files, vector DB artifacts, uploads, and runtime caches are configured as local-only by ignore rules and are not required to be uploaded with source code.
 
 ## Tech Stack
 - Backend: Python, FastAPI, Uvicorn
