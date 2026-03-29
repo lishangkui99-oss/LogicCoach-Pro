@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-multipart
+openai
+chromadb
+python-dotenv
+requests
+pdfplumber
+sentence-transformers
+python-docx
+nest-asyncio
+llama-parse

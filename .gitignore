@@ -1,8 +1,7 @@
+node_modules
 .env
-backend/.env
-venv/
-__pycache__/
-chroma_db/
-uploads/
-*.log
-node_modules/
+.env.local
+*.env
+*.env.local
+logiccoach-backend/.env
+logiccoach-frontend/.env
