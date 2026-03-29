@@ -1,14 +1,67 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  trackPageViewed,
+  trackResumeUploadCompleted,
+  trackResumeUploadStarted,
+} from '../../analytics/trackers/layer0';
+import { trackClickedStartInterview } from '../../analytics/trackers/layer1';
+import { trackSessionReplayed } from '../../analytics/trackers/layer5';
 
 export default function Home() {
   const navigate = useNavigate();
   const [resume, setResume] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState('');
+  const [enteredAt] = useState(() => Date.now());
+
+  const clientUserId = useMemo(() => {
+    try {
+      const key = 'logiccoach_user_id';
+      const existing = localStorage.getItem(key);
+      if (existing) return existing;
+      const created = `uid_${crypto.randomUUID()}`;
+      localStorage.setItem(key, created);
+      return created;
+    } catch {
+      return 'anonymous';
+    }
+  }, []);
+
+  useEffect(() => {
+    trackPageViewed();
+
+    try {
+      const firstSeenKey = 'logiccoach_first_seen_ts';
+      const sessionsKey = 'logiccoach_total_sessions';
+
+      const now = Date.now();
+      const firstSeenRaw = localStorage.getItem(firstSeenKey);
+      const sessionsRaw = localStorage.getItem(sessionsKey);
+
+      const firstSeen = firstSeenRaw ? Number(firstSeenRaw) : now;
+      if (!firstSeenRaw) {
+        localStorage.setItem(firstSeenKey, String(firstSeen));
+      }
+
+      const totalSessions = sessionsRaw ? Number(sessionsRaw) + 1 : 1;
+      localStorage.setItem(sessionsKey, String(totalSessions));
+
+      if (totalSessions > 1) {
+        const daysSinceFirst = Math.floor((now - firstSeen) / (1000 * 60 * 60 * 24));
+        trackSessionReplayed(daysSinceFirst, totalSessions);
+      }
+    } catch {
+      // silent
+    }
+  }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setResume(e.target.files[0]);
+      const file = e.target.files[0];
+      const ext = file.name.includes('.') ? file.name.split('.').pop() || 'unknown' : 'unknown';
+      trackResumeUploadStarted(ext);
+      setResume(file);
+      trackResumeUploadCompleted(true, Math.round(file.size / 1024));
     }
   };
 
@@ -19,19 +72,48 @@ export default function Home() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setResume(e.dataTransfer.files[0]);
+      const file = e.dataTransfer.files[0];
+      const ext = file.name.includes('.') ? file.name.split('.').pop() || 'unknown' : 'unknown';
+      trackResumeUploadStarted(ext);
+      setResume(file);
+      trackResumeUploadCompleted(true, Math.round(file.size / 1024));
     }
   };
 
-  const startLiveSimulation = () => {
+  const fetchInterviewRound = async (): Promise<number> => {
+    try {
+      const res = await fetch(`/api/interview/round?user_id=${encodeURIComponent(clientUserId)}`);
+      if (!res.ok) return 0;
+      const data = await res.json();
+      return Number.isFinite(data?.interview_round) ? data.interview_round : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const startLiveSimulation = async () => {
+    const interviewRound = await fetchInterviewRound();
+    trackClickedStartInterview({
+      interview_round: interviewRound,
+      resume_uploaded: Boolean(resume),
+      time_on_page_sec: Math.round((Date.now() - enteredAt) / 1000),
+    });
+
     navigate('/interview', {
-      state: { jdText: jobDescription, resumeFile: resume }
+      state: { jdText: jobDescription, resumeFile: resume },
     });
   };
 
-  const uploadRecording = () => {
+  const uploadRecording = async () => {
+    const interviewRound = await fetchInterviewRound();
+    trackClickedStartInterview({
+      interview_round: interviewRound,
+      resume_uploaded: Boolean(resume),
+      time_on_page_sec: Math.round((Date.now() - enteredAt) / 1000),
+    });
+
     navigate('/interview', {
-      state: { jdText: jobDescription, resumeFile: resume, mode: 'upload' as const }
+      state: { jdText: jobDescription, resumeFile: resume, mode: 'upload' as const },
     });
   };
 

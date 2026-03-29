@@ -1,5 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { requestMicWithTracking } from '../../analytics/trackers/layer2';
+import {
+  startWaitingTimer,
+  trackAudioUploadCompleted,
+  trackAudioUploadFailed,
+  trackAudioUploadStarted,
+} from '../../analytics/trackers/layer3';
+import {
+  createReportScrollDepthTracker,
+  trackFeedbackSubmitted,
+  trackReportSectionViewed,
+  trackViewedFinalReport,
+} from '../../analytics/trackers/layer4';
 import {
   Chart as ChartJS,
   RadialLinearScale,
@@ -43,10 +56,46 @@ export default function InterviewCoach() {
   const [barData, setBarData] = useState<{labels: string[], data: number[]} | null>(null);
   const [transcriptHtml, setTranscriptHtml] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackComment, setFeedbackComment] = useState('');
 
   // 录音引用
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const waitingTrackerRef = useRef<ReturnType<typeof startWaitingTimer> | null>(null);
+
+  useEffect(() => {
+    if (!hasResult) return;
+
+    trackViewedFinalReport(
+      score,
+      Array.isArray(suggestions) ? suggestions.length : 0,
+      Math.max(1, Math.round((question?.length || 0) / 180)),
+    );
+    trackReportSectionViewed('score');
+    trackReportSectionViewed('suggestion');
+    trackReportSectionViewed('transcript');
+
+    const depthTracker = createReportScrollDepthTracker();
+    const onScroll = () => depthTracker.onScroll();
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, [hasResult, score, suggestions, question]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        waitingTrackerRef.current?.trackUserWaited(true);
+      } catch {
+        // silent
+      }
+    };
+  }, []);
 
   // --- 逻辑函数 ---
 
@@ -54,7 +103,11 @@ export default function InterviewCoach() {
   const toggleRecording = async () => {
     if (!isRecording) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await requestMicWithTracking();
+        if (!stream) {
+          alert('无法访问麦克风，请检查权限');
+          return;
+        }
         const mediaRecorder = new MediaRecorder(stream);
         mediaRecorderRef.current = mediaRecorder;
         audioChunksRef.current = [];
@@ -80,7 +133,13 @@ export default function InterviewCoach() {
     setLoading(true);
     setHasResult(false);
 
+    waitingTrackerRef.current = startWaitingTimer();
+
     const blob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+    const uploadStart = Date.now();
+    const fileSizeMb = blob.size / (1024 * 1024);
+    trackAudioUploadStarted(fileSizeMb, 'wav');
+
     const formData = new FormData();
     formData.append("file", blob, "input.wav");
     formData.append("jd_text", jdText || (mode === 'mock' ? "通用面试" : ""));
@@ -97,13 +156,18 @@ export default function InterviewCoach() {
         body: formData 
       });
       const data = await res.json();
+      trackAudioUploadCompleted((Date.now() - uploadStart) / 1000, fileSizeMb);
 
       if (data.status === "success") {
         processResult(data);
+        waitingTrackerRef.current?.trackUserWaited(false);
+        waitingTrackerRef.current = null;
       } else {
+        trackAudioUploadFailed('network', fileSizeMb);
         alert("分析失败: " + data.message);
       }
     } catch (error) {
+      trackAudioUploadFailed('network', fileSizeMb);
       console.error(error);
       alert("连接服务器失败，请确保后端 uvicorn 已启动");
     } finally {
@@ -155,6 +219,10 @@ export default function InterviewCoach() {
 
     setSuggestions(analysis.improvement_suggestions);
     setHasResult(true);
+  };
+
+  const submitFeedback = () => {
+    trackFeedbackSubmitted(feedbackRating, feedbackComment.length);
   };
 
   // --- UI 渲染 ---
@@ -348,14 +416,42 @@ export default function InterviewCoach() {
 
                     {/* 建议列表 */}
                     <div className="mt-8 pt-6 border-t border-slate-700/50">
-                        <h4 className="text-sm font-bold text-yellow-500 mb-4">💡 改进建议</h4>
-                        <ul className="space-y-2 text-sm text-slate-400">
-                            {suggestions.map((s, i) => (
-                                <li key={i} className="flex gap-2">
-                                    <span className="text-blue-500">•</span> {s}
-                                </li>
-                            ))}
-                        </ul>
+                      <h4 className="text-sm font-bold text-yellow-500 mb-4">💡 改进建议</h4>
+                      <ul className="space-y-2 text-sm text-slate-400">
+                        {suggestions.map((s, i) => (
+                          <li key={i} className="flex gap-2">
+                            <span className="text-blue-500">•</span> {s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="mt-8 pt-6 border-t border-slate-700/50 space-y-3">
+                      <h4 className="text-sm font-bold text-blue-400">📝 报告反馈</h4>
+                      <div className="flex items-center gap-3 text-sm text-slate-300">
+                        <span>评分</span>
+                        <input
+                          type="range"
+                          min={1}
+                          max={5}
+                          value={feedbackRating}
+                          onChange={(e) => setFeedbackRating(Number(e.target.value))}
+                        />
+                        <span>{feedbackRating}</span>
+                      </div>
+                      <textarea
+                        value={feedbackComment}
+                        onChange={(e) => setFeedbackComment(e.target.value)}
+                        placeholder="欢迎提交你的反馈..."
+                        className="w-full bg-slate-900/50 border border-slate-700 rounded-xl p-3 text-sm focus:border-blue-500 outline-none resize-none"
+                        rows={3}
+                      />
+                      <button
+                        onClick={submitFeedback}
+                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm"
+                      >
+                        提交反馈
+                      </button>
                     </div>
                 </div>
             </div>

@@ -1,6 +1,8 @@
 {
   "dependencies": {
+    "@supabase/supabase-js": "^2.100.1",
     "chart.js": "^4.5.1",
+    "posthog-js": "^1.364.1",
     "react-chartjs-2": "^5.3.1"
   }
 }

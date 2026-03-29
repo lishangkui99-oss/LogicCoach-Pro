@@ -1,5 +1,9 @@
 .env
+.env.local
 backend/.env
+backend/.env.local
+frontend/.env
+frontend/.env.local
 venv/
 __pycache__/
 chroma_db/
