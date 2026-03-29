@@ -1,22 +1,7 @@
+node_modules
 .env
 .env.local
-backend/.env
-backend/.env.local
-frontend/.env
-frontend/.env.local
-venv/
-__pycache__/
-chroma_db/
-uploads/
-*.log
-node_modules/
-
-# Local data and generated artifacts
-knowledge_base/
-backend/chroma_db/
-backend/uploads/
-backend/knowledge_base/
-backups/
-*.sqlite3
-*.bundle
-*.patch
+*.env
+*.env.local
+logiccoach-backend/.env
+logiccoach-frontend/.env
